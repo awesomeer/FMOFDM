@@ -12,59 +12,25 @@
 #include <stm32l4xx.h>
 #include <led.h>
 #include <usart2.h>
+#include <cli.h>
 
-/*-----------------------------------------------------------*/
-
-static void exampleTask( void * parameters ) __attribute__( ( noreturn ) );
-
-/*-----------------------------------------------------------*/
-
-uint8_t uart_rx[128];
-uint8_t buffer[128];
-static void exampleTask( void * parameters )
-{
-    /* Unused parameters. */
-    ( void ) parameters;
-
-    for( ; ; )
-    {
-        /* Example Task Code */
-        LD3_toggle();
-
-        TickType_t tick_count = xTaskGetTickCount();
-        uint32_t len = snprintf ( ( char * ) buffer, sizeof(buffer), "Hello from FreeRTOS! Tick count: %d\n\r",  (uint32_t)tick_count);
-        usart2_write( buffer, len );
-
-        vTaskGetRunTimeStats( ( char * ) buffer );
-        usart2_write( buffer, strlen(buffer) );
-
-        len = usart2_read(uart_rx, sizeof(uart_rx)-1, 0 );
-        if (len > 0) {
-            uart_rx[len] = '\0'; // Null-terminate the received string
-            len = snprintf ( ( char * ) buffer, sizeof(buffer),"Received: %d bytes: %s\n\r", len, uart_rx );
-            usart2_write( buffer, len );
-        }
-
-        vTaskDelay( pdMS_TO_TICKS( 1000 ) ); /* delay 1 second */
-    }
-}
-/*-----------------------------------------------------------*/
 
 int main( void )
 {
 
     LD3_init();
     usart2_init();
-    static StaticTask_t exampleTaskTCB;
-    static StackType_t exampleTaskStack[ configMINIMAL_STACK_SIZE*2 ];
 
-    ( void ) xTaskCreateStatic( &exampleTask,
-                                "example",
+    static StaticTask_t cliTaskTCB;
+    static StackType_t cliTaskStack[ configMINIMAL_STACK_SIZE*2 ];
+
+    ( void ) xTaskCreateStatic( &cliTask,
+                                "cli",
                                 configMINIMAL_STACK_SIZE*2,
                                 NULL,
                                 configMAX_PRIORITIES - 1U,
-                                &( exampleTaskStack[ 0 ] ),
-                                &( exampleTaskTCB ) );
+                                &( cliTaskStack[ 0 ] ),
+                                &( cliTaskTCB ) );
 
     /* Start the scheduler. */
     vTaskStartScheduler();

@@ -67,6 +67,7 @@ extern uint32_t SystemCoreClock;
 #define configUSE_STATS_FORMATTING_FUNCTIONS 1
 #define configSUPPORT_STATIC_ALLOCATION 1
 #define configSUPPORT_DYNAMIC_ALLOCATION 1
+#define configCOMMAND_INT_MAX_OUTPUT_SIZE 256
 
 /* Co-routine definitions. */
 #define configUSE_CO_ROUTINES 			0
