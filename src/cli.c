@@ -10,6 +10,7 @@
 #include <usart2.h>
 #include <cli.h>
 #include <dac.h>
+#include <fmofdm.h>
 
 
 #define CONSOLE_GREETING "FreeRTOS$ "
@@ -111,6 +112,32 @@ static BaseType_t genFreq_func(char *pcWriteBuffer, size_t xWriteBufferLen, cons
 	return pdFALSE;
 }
 
+/*
+ * Create OFDM Symbol Command
+ * Create an OFDM symbol based on the input data (2 bytes)
+ */
+
+static BaseType_t genOFDM_func(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
+static const CLI_Command_Definition_t genOFDMSymbol_cmd =
+{
+	.pcCommand = "genOFDM",
+	.pcHelpString = "genOFDM: Create an OFDM symbol based on the input data (2 bytes)\r\n",
+	.pxCommandInterpreter = genOFDM_func,
+	.cExpectedNumberOfParameters = 1
+};
+
+static BaseType_t genOFDM_func(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
+{
+	BaseType_t xParameterStringLength;
+	// Get Symbol or Burst parameter
+	const char *pcParameter = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParameterStringLength);
+
+	fmofdm_send_data((uint8_t *)pcParameter, xParameterStringLength);
+
+	snprintf(pcWriteBuffer, xWriteBufferLen, "Sent the string: %s\r\n", pcParameter);
+	return pdFALSE;
+}
+
 void cliTask(void * parameters)
 {
 	(void) parameters;
@@ -120,6 +147,7 @@ void cliTask(void * parameters)
 	FreeRTOS_CLIRegisterCommand(&getTime_cmd);
 	FreeRTOS_CLIRegisterCommand(&getRunTimeStats_cmd);
 	FreeRTOS_CLIRegisterCommand(&genFreq_cmd);
+	FreeRTOS_CLIRegisterCommand(&genOFDMSymbol_cmd);
 
 	while(pdTRUE)
 	{
