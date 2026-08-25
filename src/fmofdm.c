@@ -17,15 +17,16 @@
 #define NUM_PREAMBLE 5
 #define NUM_SIGNAL_SYMBOLS 1
 #define NUM_DATA_SYMBOLS 16
+#define NUM_SYMBOLS (NUM_PREAMBLE + NUM_SIGNAL_SYMBOLS + NUM_DATA_SYMBOLS)
+
 #define BYTES_PER_SYMBOL 4
 #define BITS_PER_POINT 4
-#define NUM_SYMBOLS (NUM_PREAMBLE + NUM_SIGNAL_SYMBOLS + NUM_DATA_SYMBOLS)
 
 #define PHASE_RES (360.0f / ((float)NUM_FFT_LEN))
 
 
-static arm_rfft_instance_q15 recv_ifft_inst;
-static arm_rfft_instance_q15 recv_fft_inst;
+static arm_rfft_instance_q15 fmofdm_ifft_inst;
+static arm_rfft_instance_q15 fmofdm_fft_inst;
 
 static q15_t ifft_input[(NUM_BINS+1)*2];
 static q15_t fmofdm_burst[NUM_SYMBOLS][NUM_FFT_LEN];
@@ -56,7 +57,7 @@ static void fmofdm_create_preamble(q15_t * preamble)
         buffer.bin[i].imag = MAX_AMP;
     }
 
-    arm_rfft_q15(&recv_ifft_inst, buffer.raw, preamble);
+    arm_rfft_q15(&fmofdm_ifft_inst, buffer.raw, preamble);
 }
 
 // This function generates a FMOFDM symbol based on the input data
@@ -117,7 +118,7 @@ static void fmofdm_create_symbol(uint8_t * data, q15_t * output)
         }
     }
 
-    arm_rfft_q15(&recv_ifft_inst, buffer.raw, output);
+    arm_rfft_q15(&fmofdm_ifft_inst, buffer.raw, output);
 }
 
 static void fmofdm_create_burst(uint8_t * data, uint32_t length, q15_t * burst_output)
@@ -146,6 +147,7 @@ void fmofdm_send_data(uint8_t * data, uint16_t length)
 {
     fmofdm_create_burst(data, length, (q15_t *)fmofdm_burst);
 
+    // Make sure length is always a multiple of 4, round up if needed
     if(length % BYTES_PER_SYMBOL)
     {
         length += BYTES_PER_SYMBOL - (length % BYTES_PER_SYMBOL);
@@ -236,7 +238,7 @@ static FMOFDM_RX_t recvState = INIT;
 static FMOFDM_RX_t prev_recvState = INIT;
 
 static char recv_bytes[NUM_DATA_SYMBOLS*BYTES_PER_SYMBOL];
-static char recv_bytes_idx = 0;
+
 void fmofdmTask(void * parameters)
 {
     (void) parameters;
@@ -247,8 +249,8 @@ void fmofdmTask(void * parameters)
     dac_init();
     adc_init();
 
-    arm_rfft_init_q15(&recv_ifft_inst, NUM_FFT_LEN, 1, 1);
-    arm_rfft_init_q15(&recv_fft_inst, NUM_FFT_LEN, 0, 1);
+    arm_rfft_init_q15(&fmofdm_ifft_inst, NUM_FFT_LEN, 1, 1);
+    arm_rfft_init_q15(&fmofdm_fft_inst, NUM_FFT_LEN, 0, 1);
 
     fmofdmMessageBuffer = xMessageBufferCreateStatic( sizeof( fmofdm_recv_messageBuffer_array ),
                                                             fmofdm_recv_messageBuffer_array,
@@ -307,7 +309,7 @@ void fmofdmTask(void * parameters)
                 cq15_t * recvBins_cq = (cq15_t *)recvBins;
                 memcpy(recvTemp, recvData, sizeof(q15_t)*NUM_FFT_LEN);
 
-                arm_rfft_q15(&recv_fft_inst, recvData, recvBins);
+                arm_rfft_q15(&fmofdm_fft_inst, recvData, recvBins);
 
                 angle_rcvd = atan2f( ((float)recvBins_cq[1].imag) / (float)(1 << 15), ((float)recvBins_cq[1].real) / (float)(1 << 15));
                 angle_rcvd *= 180.0f / (float)M_PI; // Convert to degrees
@@ -317,7 +319,10 @@ void fmofdmTask(void * parameters)
                     angle_rcvd += 360.0f;
                 }
 
+                // Get how samples we need to shift in order to achieve 0 phase offset
+                // This is my version of symbol timing recovery
                 int8_t phase_offset = (int8_t)((angle_rcvd + PHASE_RES/2) / PHASE_RES);
+                // Handle edge where rounding up gives us a shift 32 (same as 0 shift)
                 phase_offset = phase_offset % NUM_FFT_LEN;
                 if(phase_offset != 0)
                 {
@@ -348,7 +353,7 @@ void fmofdmTask(void * parameters)
                 recv_bytes_idx = 0;
                 memset((void *)recv_bytes, 0, sizeof(recv_bytes));
 
-                arm_rfft_q15(&recv_fft_inst, recvData, recvBins);
+                arm_rfft_q15(&fmofdm_fft_inst, recvData, recvBins);
                 recv_num_bytes = fmofdm_decode_symbol((cq15_t *)recvBins);
                 if(recv_num_bytes > NUM_DATA_SYMBOLS*BYTES_PER_SYMBOL)
                 {
@@ -375,7 +380,7 @@ void fmofdmTask(void * parameters)
                     break;
                 }
                 
-                arm_rfft_q15(&recv_fft_inst, recvData, recvBins);
+                arm_rfft_q15(&fmofdm_fft_inst, recvData, recvBins);
 
                 uint32_t symbol_data = fmofdm_decode_symbol((cq15_t *)recvBins);
                 for(int byte = 0; byte < BYTES_PER_SYMBOL; byte++)
