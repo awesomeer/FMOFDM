@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stdint.h>
+
+#include <FreeRTOS.h>
 #include <arm_math.h>
 
 #define NUM_BINS 16
@@ -20,4 +22,5 @@ typedef union {
 // void fmofdm_transmit(uint8_t * data, uint32_t length);
 // void fmofdm_create_symbol(uint8_t * data, q15_t * output);
 void fmofdm_send_data(uint8_t * data, uint16_t length);
+uint32_t fmofdm_recv_data(uint8_t * data, uint16_t length, TickType_t delay);
 void fmofdmTask(void * parameters);

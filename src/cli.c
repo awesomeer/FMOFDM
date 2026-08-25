@@ -126,15 +126,26 @@ static const CLI_Command_Definition_t genOFDMSymbol_cmd =
 	.cExpectedNumberOfParameters = 1
 };
 
+static char fmofdm_recv_string[64];
 static BaseType_t genOFDM_func(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
 	BaseType_t xParameterStringLength;
 	// Get Symbol or Burst parameter
 	const char *pcParameter = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParameterStringLength);
 
+	// Send the data through FMOFDM and wait for response, timeout after 10 ticks
 	fmofdm_send_data((uint8_t *)pcParameter, xParameterStringLength);
+	uint8_t recvLen = fmofdm_recv_data(fmofdm_recv_string, 64, 10);
+	if(recvLen != 0)
+	{
+		fmofdm_recv_string[recvLen] = '\0';
+	}
+	else
+	{
+		strcpy(fmofdm_recv_string, "Error Occured!!!");
+	}
 
-	snprintf(pcWriteBuffer, xWriteBufferLen, "Sent the string: %s\r\n", pcParameter);
+	snprintf(pcWriteBuffer, xWriteBufferLen, "Sent the string: %s\r\nRecv the string: %s\r\n", pcParameter, fmofdm_recv_string);
 	return pdFALSE;
 }
 
