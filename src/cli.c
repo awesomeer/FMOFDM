@@ -3,10 +3,13 @@
 #include <task.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include <usart2.h>
 #include <cli.h>
+#include <dac.h>
 
 
 #define CONSOLE_GREETING "FreeRTOS$ "
@@ -57,6 +60,57 @@ static BaseType_t getRunTimeStats_func(char *pcWriteBuffer, size_t xWriteBufferL
 	return pdFALSE;
 }
 
+/*
+ * Generate Frequency Command
+ * Generate sine wave with specified frequency
+ */
+
+static BaseType_t genFreq_func(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
+static const CLI_Command_Definition_t genFreq_cmd =
+{
+	.pcCommand = "genFreq",
+	.pcHelpString = "genFreq: Generate sine wave with specified frequency\r\n",
+	.pxCommandInterpreter = genFreq_func,
+	.cExpectedNumberOfParameters = 1
+};
+
+static int16_t cosine[100];
+static void generateSineWave(uint32_t freq, int16_t *buffer, size_t length)
+{
+
+	float y[3] = {0, 0, 0};
+	float x[2] = {0.99, 0};
+
+	// y[n] = x[n] - y[n-2] + 2*cos(w0)*y[n-1] - cos(w0)*x[n-1]
+	// y[n] = x[n] - y[n-2] + cos(w0)*(2*y[n-1] - x[n-1])
+	float cw0 = cosf(2*M_PI*((float)freq)/100.0f); // Assuming a sample rate of 100 Hz
+	for (size_t i = 0; i < length; i++)
+	{ 
+		y[0] = x[0] - y[2] + cw0 * (2 * y[1] - x[1]);
+		buffer[i] = y[0] * (1 << 15);
+		buffer[i] += 0x8000;
+
+		x[1] = x[0];
+		x[0] = 0;
+
+		y[2] = y[1];
+		y[1] = y[0];
+	}
+}
+
+static BaseType_t genFreq_func(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
+{
+	BaseType_t xParameterStringLength;
+	const char *pcParameter = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParameterStringLength);
+	uint32_t freq = (uint32_t)atoi(pcParameter);
+
+	generateSineWave(freq, cosine, 100);
+	dac_transmit(cosine, 100);
+
+	snprintf(pcWriteBuffer, xWriteBufferLen, "Cosine wave generated with frequency: %d Hz\r\n", freq);
+	return pdFALSE;
+}
+
 void cliTask(void * parameters)
 {
 	(void) parameters;
@@ -65,6 +119,7 @@ void cliTask(void * parameters)
 
 	FreeRTOS_CLIRegisterCommand(&getTime_cmd);
 	FreeRTOS_CLIRegisterCommand(&getRunTimeStats_cmd);
+	FreeRTOS_CLIRegisterCommand(&genFreq_cmd);
 
 	while(pdTRUE)
 	{

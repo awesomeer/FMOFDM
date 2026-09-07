@@ -13,6 +13,7 @@
 #include <led.h>
 #include <usart2.h>
 #include <cli.h>
+#include <dac.h>
 
 
 int main( void )
@@ -20,6 +21,7 @@ int main( void )
 
     LD3_init();
     usart2_init();
+    dac_init();
 
     static StaticTask_t cliTaskTCB;
     static StackType_t cliTaskStack[ configMINIMAL_STACK_SIZE*2 ];
