@@ -18,9 +18,17 @@ typedef union {
     q15_t  * raw;
 } cq15_bins_t;
 
-// void fmofdm_init(void);
-// void fmofdm_transmit(uint8_t * data, uint32_t length);
-// void fmofdm_create_symbol(uint8_t * data, q15_t * output);
+/*
+ * Get Data from the FMOFDM interface
+ */
 void fmofdm_send_data(uint8_t * data, uint16_t length);
+
+/*
+ * Send Data out FMOFDM interface
+ */
 uint32_t fmofdm_recv_data(uint8_t * data, uint16_t length, TickType_t delay);
+
+/*
+ * Task that contains a State Machine to receive and decode FMOFDM transmissions
+ */
 void fmofdmTask(void * parameters);
