@@ -19,11 +19,22 @@
 int main( void )
 {
 
-    // Change MSI clock to 32 MHz
-    // FLASH->ACR |= FLASH_ACR_LATENCY_1WS; // Set Flash latency to 1 wait state
-    // RCC->CR  = (RCC->CR & ~RCC_CR_MSIRANGE_Msk) | (0b1011 << RCC_CR_MSIRANGE_Pos); // Clear MSIRANGE bits and set to 32 MHz
-    // RCC->CR |= RCC_CR_MSIRGSEL; // Select MSIRANGE from RCC_CR register
-    // SystemCoreClockUpdate();
+    FLASH->ACR |= FLASH_ACR_LATENCY_1WS; // Set Flash latency to 1 wait state
+
+    // Change SYSCLK to 80 MHz
+    RCC->PLLCFGR = (0b01 << RCC_PLLCFGR_PLLSRC_Pos) |   // Set PLL source to MSI @ 4 MHz
+                    (0b000 << RCC_PLLCFGR_PLLM_Pos) |   // Set PLLM to 1
+                    (40 << RCC_PLLCFGR_PLLN_Pos)    |   // Set PLLN to 40 VCO Freq = 160 MHz
+                    (0b00 << RCC_PLLCFGR_PLLR_Pos)  |   // Set PLLR to 2
+                    (RCC_PLLCFGR_PLLREN);               // Enable PLLR output
+
+    RCC->CR |= RCC_CR_PLLON;            // Enable PLL
+    while(!(RCC->CR & RCC_CR_PLLRDY));  // Wait for PLL to lock
+
+    RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW_Msk) | (0b11 << RCC_CFGR_SW_Pos); // Select PLL as system clock
+    while((RCC->CFGR & RCC_CFGR_SWS_Msk) != (0b11 << RCC_CFGR_SWS_Pos));    // Wait for PLL to be selected as system clock
+
+    SystemCoreClockUpdate();
 
     LD3_init();
     usart2_init();
