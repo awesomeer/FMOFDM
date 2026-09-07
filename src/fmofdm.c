@@ -1,11 +1,10 @@
 
 #include <math.h>
 
-#include <FreeRTOS.h>
-#include <task.h>
-
-
 #include <fmofdm.h>
+#include <task.h>
+#include <message_buffer.h>
+
 #include <adc.h>
 #include <dac.h>
 #include <stm32l432xx.h>
@@ -163,6 +162,16 @@ void fmofdm_send_data(uint8_t * data, uint16_t length)
     RX side functions and state machine
 */
 
+#define RECV_MESSAGE_BUFFER_SIZE 1500
+static uint8_t fmofdm_recv_messageBuffer_array[RECV_MESSAGE_BUFFER_SIZE];
+static StaticMessageBuffer_t fmofdmMessageBufferStruct;
+static MessageBufferHandle_t fmofdmMessageBuffer;
+
+uint32_t fmofdm_recv_data(uint8_t * data, uint16_t length, TickType_t delay)
+{
+    return xMessageBufferReceive(fmofdmMessageBuffer, data, length, delay);
+}
+
 static uint32_t fmofdm_decode_symbol(cq15_t * fft_bins)
 {
     uint32_t decoded_data = 0;
@@ -226,7 +235,7 @@ typedef enum{
 static FMOFDM_RX_t recvState = INIT;
 static FMOFDM_RX_t prev_recvState = INIT;
 
-static volatile char recv_bytes[16];
+static char recv_bytes[NUM_DATA_SYMBOLS*BYTES_PER_SYMBOL];
 static char recv_bytes_idx = 0;
 void fmofdmTask(void * parameters)
 {
@@ -240,6 +249,10 @@ void fmofdmTask(void * parameters)
 
     arm_rfft_init_q15(&recv_ifft_inst, NUM_FFT_LEN, 1, 1);
     arm_rfft_init_q15(&recv_fft_inst, NUM_FFT_LEN, 0, 1);
+
+    fmofdmMessageBuffer = xMessageBufferCreateStatic( sizeof( fmofdm_recv_messageBuffer_array ),
+                                                            fmofdm_recv_messageBuffer_array,
+                                                            &fmofdmMessageBufferStruct);
 
     // Configure and Enable TIM6 for DMA triggering
     RCC->APB1ENR1 |= RCC_APB1ENR1_TIM6EN;
@@ -285,7 +298,7 @@ void fmofdmTask(void * parameters)
             case PREAMBLE:
             {
                 // If we stay in PREAMBLE too long, then just reset back to INIT
-                if(preamble_retry++ > NUM_PREAMBLE);
+                if(preamble_retry++ > NUM_PREAMBLE)
                 {
                     recvState = INIT;
                     break;
@@ -368,10 +381,13 @@ void fmofdmTask(void * parameters)
                 for(int byte = 0; byte < BYTES_PER_SYMBOL; byte++)
                 {
                     recv_bytes[recv_bytes_idx++] = (symbol_data >> (byte*8)) & 0xFF;
-                    recv_bytes_idx = recv_bytes_idx % sizeof(recv_bytes);
                     recv_num_bytes--;
                     if(recv_num_bytes == 0)
                     {
+                        xMessageBufferSend(fmofdmMessageBuffer,
+                                            recv_bytes,
+                                            recv_bytes_idx,
+                                            0);
                         recvState = INIT;
                         break;
                     }
