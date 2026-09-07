@@ -12,12 +12,14 @@
 #include "arm_math.h"
 
 #define MAX_AMP 0x7000
-// 1 preamble + 8 symbols
+#define AMP_SPACE 0x2000
+
+// 5 preamble + 1 signal + 16 symbols
 #define NUM_PREAMBLE 5
 #define NUM_SIGNAL_SYMBOLS 1
 #define NUM_DATA_SYMBOLS 16
-#define BYTES_PER_SYMBOL 2
-#define BITS_PER_POINT 2
+#define BYTES_PER_SYMBOL 4
+#define BITS_PER_POINT 4
 #define NUM_SYMBOLS (NUM_PREAMBLE + NUM_SIGNAL_SYMBOLS + NUM_DATA_SYMBOLS)
 
 #define PHASE_RES (360.0f / ((float)NUM_FFT_LEN))
@@ -92,23 +94,24 @@ static void fmofdm_create_symbol(uint8_t * data, q15_t * output)
         for(int q = 0; q < 8; q+=BITS_PER_POINT) // Iterate through each bit pair in the byte
         {
             uint8_t bit_pair = (data[byte] >> q) & 0x03;
+            int16_t bit_pair_mag = (data[byte] >> (q+2)) & 0x03;
             switch(bit_pair)
             {
                 case 0b00:  // 45 degrees
-                    buffer.bin[buffer_idx].real = MAX_AMP;
-                    buffer.bin[buffer_idx].imag = MAX_AMP;
+                    buffer.bin[buffer_idx].real = (AMP_SPACE*bit_pair_mag) + (AMP_SPACE>>1);
+                    buffer.bin[buffer_idx].imag = (AMP_SPACE*bit_pair_mag) + (AMP_SPACE>>1);
                     break;
                 case 0b01: // 135 degrees
-                    buffer.bin[buffer_idx].real = -MAX_AMP;
-                    buffer.bin[buffer_idx].imag = MAX_AMP;
+                    buffer.bin[buffer_idx].real = -((AMP_SPACE*bit_pair_mag) + (AMP_SPACE>>1));
+                    buffer.bin[buffer_idx].imag = (AMP_SPACE*bit_pair_mag) + (AMP_SPACE>>1);
                     break;
                 case 0b10: // 225 degrees
-                    buffer.bin[buffer_idx].real = -MAX_AMP;
-                    buffer.bin[buffer_idx].imag = -MAX_AMP;
+                    buffer.bin[buffer_idx].real = -((AMP_SPACE*bit_pair_mag) + (AMP_SPACE>>1));
+                    buffer.bin[buffer_idx].imag = -((AMP_SPACE*bit_pair_mag) + (AMP_SPACE>>1));
                     break;
                 case 0b11: // 315 degrees
-                    buffer.bin[buffer_idx].real = MAX_AMP;
-                    buffer.bin[buffer_idx].imag = -MAX_AMP;
+                    buffer.bin[buffer_idx].real = (AMP_SPACE*bit_pair_mag) + (AMP_SPACE>>1);
+                    buffer.bin[buffer_idx].imag = -((AMP_SPACE*bit_pair_mag) + (AMP_SPACE>>1));
                     break;
             }
             buffer_idx++;
@@ -118,7 +121,7 @@ static void fmofdm_create_symbol(uint8_t * data, q15_t * output)
     arm_rfft_q15(&recv_ifft_inst, buffer.raw, output);
 }
 
-static void fmofdm_create_burst(uint8_t * data, uint16_t length, q15_t * burst_output)
+static void fmofdm_create_burst(uint8_t * data, uint32_t length, q15_t * burst_output)
 {
     // Create Preamble
     fmofdm_create_preamble(burst_output);
@@ -144,21 +147,25 @@ void fmofdm_send_data(uint8_t * data, uint16_t length)
 {
     fmofdm_create_burst(data, length, (q15_t *)fmofdm_burst);
 
-    if(length & 1) length++; // Pad length to even number of bytes for 2 bytes per symbol
+    if(length % BYTES_PER_SYMBOL)
+    {
+        length += BYTES_PER_SYMBOL - (length % BYTES_PER_SYMBOL);
+    }
+
     for(int j = 0; j < (NUM_PREAMBLE + NUM_SIGNAL_SYMBOLS + length/BYTES_PER_SYMBOL); j++)
     {
         convert_polar(fmofdm_burst[j], NUM_FFT_LEN);
     }
-    dac_transmit((uint16_t *)fmofdm_burst[0], NUM_FFT_LEN*(NUM_PREAMBLE + NUM_SIGNAL_SYMBOLS + length/BYTES_PER_SYMBOL));
+    dac_transmit((uint16_t *)fmofdm_burst[0], NUM_FFT_LEN*(NUM_PREAMBLE + NUM_SIGNAL_SYMBOLS + length/BYTES_PER_SYMBOL)+1);
 }
 
 /*
     RX side functions and state machine
 */
 
-static uint16_t fmofdm_decode_symbol(cq15_t * fft_bins)
+static uint32_t fmofdm_decode_symbol(cq15_t * fft_bins)
 {
-    uint16_t decoded_data = 0;
+    uint32_t decoded_data = 0;
     uint32_t bin_idx = 1;
     for(int byte = 0; byte < BYTES_PER_SYMBOL; byte++)
     {
@@ -183,6 +190,23 @@ static uint16_t fmofdm_decode_symbol(cq15_t * fft_bins)
             {
                 bits = 0b11;
             }
+
+            q15_t bin_mag;
+            arm_cmplx_mag_q15((q15_t *) &fft_bins[bin_idx], &bin_mag, 1);
+            
+            if(bin_mag > 500)
+            {
+                bits |= 0b11 << 2;
+            }
+            else if(bin_mag > 300)
+            {
+                bits |= 0b10 << 2;
+            }
+            else if(bin_mag > 150)
+            {
+                bits |= 0b01 << 2;
+            }
+
             dataByte |= bits << q;
             
             bin_idx++;
@@ -340,7 +364,7 @@ void fmofdmTask(void * parameters)
                 
                 arm_rfft_q15(&recv_fft_inst, recvData, recvBins);
 
-                uint16_t symbol_data = fmofdm_decode_symbol((cq15_t *)recvBins);
+                uint32_t symbol_data = fmofdm_decode_symbol((cq15_t *)recvBins);
                 for(int byte = 0; byte < BYTES_PER_SYMBOL; byte++)
                 {
                     recv_bytes[recv_bytes_idx++] = (symbol_data >> (byte*8)) & 0xFF;
