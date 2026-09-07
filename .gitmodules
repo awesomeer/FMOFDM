@@ -1,3 +1,6 @@
 [submodule "submodules/STM32CubeL4"]
 	path = submodules/STM32CubeL4
 	url = https://github.com/STMicroelectronics/STM32CubeL4.git
+[submodule "submodules/FreeRTOS"]
+	path = submodules/FreeRTOS
+	url = https://github.com/FreeRTOS/FreeRTOS.git
