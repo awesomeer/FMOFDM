@@ -13,15 +13,20 @@
 #include <led.h>
 #include <usart2.h>
 #include <cli.h>
-#include <dac.h>
+#include <fmofdm.h>
 
 
 int main( void )
 {
 
+    // Change MSI clock to 32 MHz
+    // FLASH->ACR |= FLASH_ACR_LATENCY_1WS; // Set Flash latency to 1 wait state
+    // RCC->CR  = (RCC->CR & ~RCC_CR_MSIRANGE_Msk) | (0b1011 << RCC_CR_MSIRANGE_Pos); // Clear MSIRANGE bits and set to 32 MHz
+    // RCC->CR |= RCC_CR_MSIRGSEL; // Select MSIRANGE from RCC_CR register
+    // SystemCoreClockUpdate();
+
     LD3_init();
     usart2_init();
-    dac_init();
 
     static StaticTask_t cliTaskTCB;
     static StackType_t cliTaskStack[ configMINIMAL_STACK_SIZE*2 ];
@@ -34,6 +39,16 @@ int main( void )
                                 &( cliTaskStack[ 0 ] ),
                                 &( cliTaskTCB ) );
 
+    static StaticTask_t fmofdmTaskTCB;
+    static StackType_t fmofdmTaskStack[configMINIMAL_STACK_SIZE*2];
+
+    ( void ) xTaskCreateStatic( &fmofdmTask,
+                                "fmofdm",
+                                configMINIMAL_STACK_SIZE*2,
+                                NULL,
+                                configMAX_PRIORITIES - 1U,
+                                &( fmofdmTaskStack[ 0 ] ),
+                                &( fmofdmTaskTCB ) );
     /* Start the scheduler. */
     vTaskStartScheduler();
 
