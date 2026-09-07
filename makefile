@@ -42,6 +42,7 @@ SINGLE_SRCS +=	$(CMSIS_DSP)/Source/TransformFunctions/arm_cfft_radix4_q15.c
 SINGLE_SRCS +=	$(CMSIS_DSP)/Source/TransformFunctions/arm_bitreversal2.c
 SINGLE_SRCS +=	$(CMSIS_DSP)/Source/FastMathFunctions/arm_sqrt_q15.c
 SINGLE_SRCS +=	$(CMSIS_DSP)/Source/StatisticsFunctions/arm_rms_q15.c
+SINGLE_SRCS +=	$(CMSIS_DSP)/Source/ComplexMathFunctions/arm_cmplx_mag_q15.c
 
 SRCS := $(SINGLE_SRCS)
 SRCS += $(wildcard $(SRC_DIR)/*.c)
