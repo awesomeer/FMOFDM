@@ -28,6 +28,7 @@ SRC_DIR := src
 
 SINGLE_SRCS := 	$(STM32CubeL4_CMSIS)/Device/ST/STM32L4xx/Source/Templates/system_stm32l4xx.c
 SINGLE_SRCS +=	$(FreeRTOS_Kernel)/portable/GCC/ARM_CM4F/port.c
+SINGLE_SRCS +=	$(FreeRTOS_Kernel)/portable/MemMang/heap_4.c
 
 SRCS := $(SINGLE_SRCS)
 SRCS += $(wildcard $(SRC_DIR)/*.c)
