@@ -1,5 +1,6 @@
 #include <usart2.h>
 #include <stream_buffer.h>
+#include <semphr.h>
 
 static uint8_t tx_buffer[128];
 static uint8_t rx_buffer[128];
@@ -10,8 +11,17 @@ static StreamBufferHandle_t txStreamHandle;
 static StaticStreamBuffer_t rxStream;
 static StreamBufferHandle_t rxStreamHandle;
 
+SemaphoreHandle_t writeMutex;
+StaticSemaphore_t writeMutexBuffer;
+
+SemaphoreHandle_t readMutex;
+StaticSemaphore_t readMutexBuffer;
+
 void usart2_init(void)
 {
+    writeMutex = xSemaphoreCreateMutexStatic(&writeMutexBuffer);
+    readMutex = xSemaphoreCreateMutexStatic(&readMutexBuffer);
+
     txStreamHandle = xStreamBufferCreateStatic( sizeof(tx_buffer), 1, tx_buffer, &txStream );
     rxStreamHandle = xStreamBufferCreateStatic( sizeof(rx_buffer), 1, rx_buffer, &rxStream );
 
@@ -42,6 +52,7 @@ void usart2_init(void)
 
 void usart2_write(const uint8_t *data, uint32_t len)
 {
+    xSemaphoreTake(writeMutex, portMAX_DELAY);
     while(len)
     {
         size_t bytes_written = xStreamBufferSend(txStreamHandle, data, len, portMAX_DELAY);
@@ -49,10 +60,12 @@ void usart2_write(const uint8_t *data, uint32_t len)
         len -= bytes_written;
         USART2->CR1 |= USART_CR1_TXEIE;  // Enable TXE interrupt to start sending
     }
+    xSemaphoreGive(writeMutex);
 }
 
 uint32_t usart2_read(uint8_t *buffer, uint32_t len, TickType_t delay)
 {   
+    xSemaphoreTake(readMutex, portMAX_DELAY);
     uint32_t bytes_received = 0;
 
     while(len)
@@ -65,6 +78,8 @@ uint32_t usart2_read(uint8_t *buffer, uint32_t len, TickType_t delay)
         len -= bytes_read;
         bytes_received += bytes_read;
     }
+
+    xSemaphoreGive(readMutex);
     return bytes_received;
 }
 
