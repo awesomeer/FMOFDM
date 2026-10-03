@@ -24,3 +24,7 @@ void dac_set(uint16_t value);
  */
 void dac_transmit(uint16_t *buffer, uint32_t length);
 
+/*
+ * Wait for the DAC transmission to complete
+ */
+void dac_waitTransmitComplete(void);

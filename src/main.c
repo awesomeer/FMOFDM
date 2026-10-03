@@ -13,8 +13,7 @@
 #include <led.h>
 #include <usart2.h>
 #include <cli.h>
-#include <fmofdm.h>
-
+#include <udp.h>
 
 static void setupClocks(void)
 {
@@ -33,6 +32,11 @@ static void setupClocks(void)
     RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW_Msk) | (0b11 << RCC_CFGR_SW_Pos); // Select PLL as system clock
     while((RCC->CFGR & RCC_CFGR_SWS_Msk) != (0b11 << RCC_CFGR_SWS_Pos));    // Wait for PLL to be selected as system clock
 
+    // Turn on HSI48 for TRNG and wait for it to be ready
+    RCC->CRRCR |= RCC_CRRCR_HSI48ON;
+    while(!(RCC->CRRCR & RCC_CRRCR_HSI48RDY));
+    RCC->AHB2ENR |= RCC_AHB2ENR_RNGEN; // Enable the RNG clock
+    
     SystemCoreClockUpdate();
 }
 
@@ -42,6 +46,8 @@ int main( void )
     setupClocks();
     LD3_init();
     usart2_init();
+
+    tcp_ip_stack_init();
 
     static StaticTask_t cliTaskTCB;
     static StackType_t cliTaskStack[ configMINIMAL_STACK_SIZE*2 ];
@@ -54,16 +60,6 @@ int main( void )
                                 &( cliTaskStack[ 0 ] ),
                                 &( cliTaskTCB ) );
 
-    static StaticTask_t fmofdmTaskTCB;
-    static StackType_t fmofdmTaskStack[configMINIMAL_STACK_SIZE*2];
-
-    ( void ) xTaskCreateStatic( &fmofdmTask,
-                                "fmofdm",
-                                configMINIMAL_STACK_SIZE*2,
-                                NULL,
-                                configMAX_PRIORITIES - 1U,
-                                &( fmofdmTaskStack[ 0 ] ),
-                                &( fmofdmTaskTCB ) );
     /* Start the scheduler. */
     vTaskStartScheduler();
 

@@ -16,7 +16,7 @@
 // 5 preamble + 1 signal + 16 symbols
 #define NUM_PREAMBLE 5
 #define NUM_SIGNAL_SYMBOLS 1
-#define NUM_DATA_SYMBOLS 16
+#define NUM_DATA_SYMBOLS 32
 #define NUM_SYMBOLS (NUM_PREAMBLE + NUM_SIGNAL_SYMBOLS + NUM_DATA_SYMBOLS)
 
 #define BYTES_PER_SYMBOL 4
@@ -145,6 +145,7 @@ static void fmofdm_create_burst(uint8_t * data, uint32_t length, q15_t * burst_o
 
 void fmofdm_send_data(uint8_t * data, uint16_t length)
 {
+    dac_waitTransmitComplete();
     fmofdm_create_burst(data, length, (q15_t *)fmofdm_burst);
 
     // Make sure length is always a multiple of 4, round up if needed

@@ -21,6 +21,8 @@ INC_DIRS +=	$(STM32CubeL4_CMSIS)/Include
 INC_DIRS +=	$(FreeRTOS_Kernel)/include
 INC_DIRS +=	$(FreeRTOS_Kernel)/portable/GCC/ARM_CM4F
 INC_DIRS +=	$(FreeRTOS_Plus)/FreeRTOS-Plus-CLI
+INC_DIRS +=	$(FreeRTOS_Plus)/FreeRTOS-Plus-TCP/source/include
+INC_DIRS +=	$(FreeRTOS_Plus)/FreeRTOS-Plus-TCP/source/portable/Compiler/GCC
 INC_DIRS +=	$(CMSIS_DSP)/Include
 
 INCS := $(addprefix -I, $(INC_DIRS))
@@ -34,6 +36,7 @@ SINGLE_SRCS := 	$(STM32CubeL4_CMSIS)/Device/ST/STM32L4xx/Source/Templates/system
 SINGLE_SRCS +=	$(FreeRTOS_Kernel)/portable/GCC/ARM_CM4F/port.c
 SINGLE_SRCS +=	$(FreeRTOS_Kernel)/portable/MemMang/heap_4.c
 SINGLE_SRCS +=	$(FreeRTOS_Plus)/FreeRTOS-Plus-CLI/FreeRTOS_CLI.c
+SINGLE_SRCS +=	$(FreeRTOS_Plus)/FreeRTOS-Plus-TCP/source/portable/BufferManagement/BufferAllocation_2.c
 SINGLE_SRCS +=	$(CMSIS_DSP)/Source/CommonTables/CommonTables.c
 SINGLE_SRCS +=	$(CMSIS_DSP)/Source/TransformFunctions/arm_rfft_init_q15.c
 SINGLE_SRCS +=	$(CMSIS_DSP)/Source/TransformFunctions/arm_rfft_q15.c
@@ -47,6 +50,7 @@ SINGLE_SRCS +=	$(CMSIS_DSP)/Source/ComplexMathFunctions/arm_cmplx_mag_q15.c
 SRCS := $(SINGLE_SRCS)
 SRCS += $(wildcard $(SRC_DIR)/*.c)
 SRCS += $(wildcard $(FreeRTOS_Kernel)/*.c)
+SRCS += $(wildcard $(FreeRTOS_Plus)/FreeRTOS-Plus-TCP/source/*.c)
 
 
 # All Assembly Files

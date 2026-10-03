@@ -58,8 +58,6 @@ void dac_set(uint16_t value)
 void dac_transmit(uint16_t *buffer, uint32_t length)
 {
 
-    xSemaphoreTake(dacDMASemaphoreHandle, portMAX_DELAY);
-
     /* Disable the DMA channel before configuring it. */
     DAC_DMA_CHANNEL->CCR &= ~DMA_CCR_EN;
 
@@ -69,6 +67,11 @@ void dac_transmit(uint16_t *buffer, uint32_t length)
 
     /* Enable the DMA channel. */
     DAC_DMA_CHANNEL->CCR |= DMA_CCR_EN;
+}
+
+void dac_waitTransmitComplete(void)
+{
+    xSemaphoreTake(dacDMASemaphoreHandle, portMAX_DELAY);
 }
 
 void DMA1_Channel3_IRQHandler(void)
